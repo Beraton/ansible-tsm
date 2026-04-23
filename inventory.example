@@ -1,6 +1,9 @@
 [tsm_clients]
 127.0.0.1 ansible_user=user ansible_password=password ansible_connection=ssh
 
+[tsm_ms_sql]
+127.0.0.1 ansible_user=administrator ansible_password=password
+
 [cluster_nodes_win]
 127.0.0.1 ansible_user=administrator ansible_password=password
 
