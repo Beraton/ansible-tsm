@@ -1,0 +1,10 @@
+---
+- hosts: all
+  pre_tasks:
+    - name: Pobieranie zmiennych
+      tags: always
+      include_vars: host_vars/vars
+
+  tasks:
+  - name: Modify dsm.opt file
+    import_tasks: roles/common/tasks/modify-dsm-opt.yml

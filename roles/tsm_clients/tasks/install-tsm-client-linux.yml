@@ -1,0 +1,179 @@
+---
+- name: Copying installation packages for IBM SP Client (RHEL/SUSE)
+  tags: linux,redhat,centos,suse,install_only
+  become: true
+  ansible.builtin.get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/files/tsm_client/TIV-TSMBAC/rpm/{{ client_version }}/pkgs.tar.gz
+    dest: /tmp/
+    force_basic_auth: true
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky" or ansible_os_family == "Suse"
+
+- name: Copying installation packages for IBM SP Client (DEB)
+  tags: linux,debian,ubuntu,install_only
+  become: true
+  ansible.builtin.get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/files/tsm_client/TIV-TSMBAC/deb/{{ client_version }}/pkgs.tar.gz
+    dest: /tmp/
+    force_basic_auth: true
+  when: ansible_os_family == "Debian"
+
+- name: Unpacking IBM SP Client packages (RHEL/DEB/SUSE)
+  tags: linux,redhat,centos,debian,ubuntu,suse,install_only
+  become: true
+  ansible.builtin.unarchive:
+    src: /tmp/pkgs.tar.gz
+    dest: /tmp/
+    remote_src: true
+  when: ansible_system == "Linux"
+
+- name: Finding RPM installation packages
+  become: true
+  tags: linux,redhat,centos,suse,install_only,no_ftp
+  ansible.builtin.find:
+    paths: /tmp/
+    patterns: "*.rpm"
+  register: main_dependency_list_rpm
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky" or ansible_os_family == "Suse"
+
+- name: Finding DEB installation packages
+  become: true
+  tags: linux,debian,ubuntu,install_only,no_ftp
+  ansible.builtin.find:
+    paths: /tmp/
+    patterns: "*.deb"
+  register: main_dependency_list_deb
+  when: ansible_os_family == "Debian"
+
+- name: Creating RPM package list to install
+  tags: linux,redhat,centos,suse,install_only,no_ftp
+  ansible.builtin.set_fact:
+    main_dependency_list: "{{ main_dependency_list_rpm.files | map(attribute='path') | list }}"
+  when: main_dependency_list_deb is skipped
+
+- name: Creating DEB package list to install
+  tags: linux,debian,ubuntu,install_only,no_ftp
+  ansible.builtin.set_fact:
+    main_dependency_list: "{{ main_dependency_list_deb.files | map(attribute='path') | list }}"
+  when: main_dependency_list_rpm is skipped
+
+- name: Installing IBM SP Client from RPM packages (RHEL)
+  become: true
+  tags: linux,redhat,centos,install_only,no_ftp
+  ansible.builtin.dnf:
+    name: "{{ main_dependency_list }}"
+    disable_gpg_check: true
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky"
+
+- name: Installing IBM SP Client from RPM packages (SUSE)
+  become: true
+  tags: linux,suse,install_only,no_ftp
+  ansible.builtin.zypper:
+    name: "{{ item }}"
+    disable_gpg_check: true
+    state: present
+  loop: "{{ main_dependency_list }}"
+  when: ansible_os_family == "Suse"
+
+- name: Installing IBM SP Client from DEB packages
+  tags: linux,debian,ubuntu,install_only,no_ftp
+  become: true
+  ansible.builtin.apt:
+    deb: "{{ item }}"
+  loop: "{{ main_dependency_list }}"
+  when: ansible_os_family == "Debian"
+
+- name: Creating dsm.opt file
+  tags: linux,no_ftp
+  become: true
+  ansible.builtin.template:
+    src: templates/dsm-linux.opt.j2
+    dest: /opt/tivoli/tsm/client/ba/bin/dsm.opt
+    owner: root
+    group: bin
+    mode: "0644"
+  when: ansible_system == "Linux"
+
+- name: Creating dsm.sys file
+  tags: linux,no_ftp
+  become: true
+  ansible.builtin.template:
+    src: templates/dsm-linux.sys.j2
+    dest: /opt/tivoli/tsm/client/ba/bin/dsm.sys
+    owner: root
+    group: bin
+    mode: "0644"
+  when: ansible_system == "Linux"
+
+- name: Adding firewall allow rule 1500/tcp (RHEL/SUSE)
+  become: true
+  tags: linux,redhat,centos,suse,install_only,no_ftp
+  ansible.builtin.command: firewall-cmd --zone=public --add-port=1500/tcp
+  register: result
+  changed_when: result.stderr == ""
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky" or ansible_os_family == "Suse"
+
+- name: Adding firewall allow rule 1500/tcp (DEB)
+  become: true
+  tags: linux,debian,install_only,no_ftp
+  community.general.ufw:
+    rule: allow
+    port: "1500"
+    proto: tcp
+  when: ansible_os_family == "Debian"
+
+- name: Creating dsmcad service
+  tags: linux,debian,redhat,centos,suse,no_ftp
+  become: true
+  ansible.builtin.copy:
+    src: templates/dsmcad.service
+    dest: /etc/systemd/system/dsmcad.service
+    owner: root
+    mode: "0755"
+  when: ansible_system == "Linux"
+
+- name: Enabling dsmcad service (RHEL/DEB)
+  tags: linux,redhat,centos,debian,no_ftp
+  become: true
+  ansible.builtin.systemd:
+    state: started
+    enabled: true
+    name: dsmcad
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky" or ansible_os_family == "Debian"
+
+- name: Enabling dsmcad service (SUSE)
+  tags: linux,suse,no_ftp
+  become: true
+  ansible.builtin.shell: systemctl start dsmcad && chkconfig --level 2,3,4,5 dsmcad on
+  when: ansible_os_family == "Suse"
+
+- name: Checking if pexpect is installed
+  tags: linux,redhat,centos,suse,debian,test,no_ftp
+  pip:
+    name: pexpect
+    state: present
+  when: ansible_system == "Linux"
+
+- name: Certificate exchange with IBM SP server (nodename version)
+  tags: linux,test,no_ftp
+  become: true
+  ansible.builtin.expect:
+    command: /opt/tivoli/tsm/client/ba/bin/dsmc query session
+    responses:
+      (.*)Please enter your user id(.*): "{{ tsm['nodename'] }}"
+      (.*)Please enter password for user id(.*): "{{ tsm_node_password }}"
+  register: expect_result
+  failed_when: expect_result.rc != 0
+  when: ansible_system == "Linux" and tsm['nodename'] is defined
+
+- name: Certificate exchange with IBM SP server (hostname version)
+  tags: linux,test,no_ftp
+  become: true
+  ansible.builtin.expect:
+    command: /opt/tivoli/tsm/client/ba/bin/dsmc query session
+    responses:
+      (.*)Please enter your user id(.*): "{{ ansible_hostname }}"
+      (.*)Please enter password for user id(.*): "{{ tsm_node_password }}"
+  register: expect_result
+  failed_when: expect_result.rc != 0
+  when: ansible_system == "Linux" and tsm['nodename'] is undefined

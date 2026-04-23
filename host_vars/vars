@@ -1,0 +1,40 @@
+baclient_path: "C:\\Program Files\\tivoli\\tsm\\baclient" #Installation path
+
+# --- Mandatory config ---
+tsm_server_name: TSMSRV01
+tcp_server_address: 127.0.0.1
+tcp_port: 1500 #IBM SP server port
+nodename: #if not set ansible will assign host name as node name
+
+# --- IBM SP Client config ---
+client_version: "8.1.19" #IBM Spectrum Protect Client version for to install on VM
+create_config: true #set false if you do not want to generate new .opt and .sys file
+tsm_node_password: CHANGE_TSM_NODE_PASSWORD #set node password
+
+# --- IBM SP for MSSQL config ---
+tdp_sql_version: "8.1.19"
+sql_user: user
+sql_user_password: CHANGE_SQL_PASSWORD
+
+# -- IBM SP for VE config ---
+tdp_version: "8.1.19" #IBM Spectrum Protect for VE version for to install on host
+tdp_install: true #if set to false ansible will remote IBM SP for VE from VM
+dsmcad_index: 001 #datamover index (usable when having multiple DM's on a single host)
+add_dm: true #if set to false ansible will not create another datamover
+http_port: 1581 #datamover port
+tdp_password: CHANGE_TDP_PASSWORD #set tdp password
+
+# --- FTP configuration ---
+ftp_server: 10.10.10.10
+ftp_user: root
+ftp_password: xxx
+
+# --- Modify dsm.opt file config ---
+action: add
+target_file: dsm.opt
+content: VMMAXVIRTUALDisks 8
+
+# --- Misc ---
+matrix_server_url: https://matrix.example.url
+matrix_auth_token: xxx 
+

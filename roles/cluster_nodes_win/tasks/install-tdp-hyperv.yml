@@ -1,0 +1,65 @@
+---
+- name: Copying packages to install TDP for Hyper-V
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/iso/Temp/Jaku/pkgs/win/SP_VE_{{ tdp_version }}_VMW_MS_HYPV_ML.exe
+    dest: C:\Users\Administrator\Downloads
+    url_username: "{{ ftp_user }}"
+    url_password: "{{ ftp_password }}"
+  when: ansible_os_family == "Windows" and tdp_install == True
+
+- name: Searching TDP for Hyper-V packages
+  tags: windows
+  ansible.windows.win_find:
+    paths: C:\Users\Administrator\Downloads
+    patterns: SP_VE_{{ tdp_version }}_VMW_MS_HYPV_ML.exe
+  register: match
+  when: ansible_os_family == "Windows" and tdp_install == True
+
+- name: Checking if installation directory already exists
+  tags: windows
+  ansible.windows.win_find:
+    paths: C:\Users\Administrator\Downloads
+    patterns: TSMHYPERV_WIN
+    file_type: directory
+  register: tsmhyperv
+  when: ansible_os_family == "Windows"
+
+- name: Unpacking installation files for TDP for Hyper-V
+  tags: windows
+  ansible.windows.win_command: .\{{ match.files[0].filename }}
+  args:
+    chdir: C:\Users\Administrator\Downloads\
+  when: ansible_os_family == "Windows" and tsmhyperv.matched == 0 and tdp_install == True
+
+- name: Installing TDP for Hyper-V
+  tags: windows
+  ansible.windows.win_powershell:
+    script: .\spinstall.exe /silent
+    chdir: C:\Users\Administrator\Downloads\TSMHYPERV_WIN\
+  when: ansible_os_family == "Windows" and tdp_install == True
+
+- name: Creating tsm_data directory
+  tags: windows
+  ansible.windows.win_file:
+    path: C:\tsm_data
+    state: directory
+  when: ansible_os_family == "Windows"
+
+- name: Copying full VM backup script to tsm_data pt.1
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_server }}/file/tdp_for_win/scripts/Backup-VMx.bat
+    dest: C:\tsm_data\
+    url_username: "{{ ftp_user }}"
+    url_password: "{{ ftp_password }}"
+  when: ansible_os_family == "Windows"
+
+- name: Copying full VM backup script to tsm_data pt.2
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_server }}/file/tdp_for_win/scripts/Backup-VMx.ps1
+    dest: C:\tsm_data\
+    url_username: "{{ ftp_user }}"
+    url_password: "{{ ftp_password }}"
+  when: ansible_os_family == "Windows"

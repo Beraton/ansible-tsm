@@ -1,0 +1,45 @@
+---
+- name: Find TSM Client Scheduler service
+  tags: windows
+  ansible.windows.win_service_info:
+    name: TSM Client Scheduler*
+  register: found_services
+
+- ansible.builtin.set_fact:
+    service_list: "{{ found_services.services | map(attribute='display_name') | list }}"
+
+- name: Get service details for each service in the list
+  tags: windows
+  ansible.windows.win_powershell:
+    script: |
+      Get-WmiObject -Class Win32_Service -Filter "Name LIKE '{{ item }}'"
+  loop: "{{ service_list }}"
+  register: service_details
+
+- ansible.builtin.set_fact:
+    services: "{{ services | default([]) + [{'name': item.output[0].DisplayName, 'pid': item.output[0].ProcessId}] }}"
+  loop: "{{ service_details.results }}"
+
+- name: Get dsmcad uptime
+  tags: windows
+  ansible.windows.win_powershell:
+    script: New-TimeSpan -Start (Get-Process -id {{ item.pid }}).StartTime
+  loop: "{{ services }}"
+  register: uptime_info
+
+- name: Alert
+  ansible.builtin.debug:
+    msg: Detected service '{{ item.item.name }}' running for longer than 1 day on {{ ansible_hostname }}
+  when: item.item.pid != 0 and item.output[0].Hours >= 3
+  loop: "{{ uptime_info.results }}"
+
+- name: Send notification if alert has been triggered
+  community.general.matrix:
+    msg_plain: "** Detected service '{{ item.item.name }}' running for longer than 1 day on {{ ansible_hostname }} **"
+    msg_html: <b>Detected service '{{ item.item.name }}' running for longer than 1 day on {{ ansible_hostname }}</b>
+    room_id: "room_ID"
+    hs_url: "{{ matrix_server_url }}"
+    token: "{{ matrix_auth_token }}"
+  when: item.item.pid != 0 and item.output[0].Days >= 1
+  loop: "{{ uptime_info.results }}"
+  delegate_to: 127.0.0.1

@@ -1,0 +1,10 @@
+---
+- hosts: all
+  pre_tasks:
+    - name: Gathering variables
+      tags: always
+      include_vars: host_vars/vars
+
+- hosts: tsm_ms_sql
+  roles:
+    - tsm_ms_sql

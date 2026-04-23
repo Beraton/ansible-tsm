@@ -1,0 +1,10 @@
+---
+- hosts: all
+  pre_tasks:
+    - name: Pobieranie zmiennych
+      tags: always
+      include_vars: host_vars/vars
+
+- hosts: cluster_nodes_win
+  roles:
+    - cluster_nodes_win

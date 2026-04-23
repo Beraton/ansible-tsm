@@ -1,0 +1,4 @@
+---
+- name: Install TSM for MS SQL
+  ansible.builtin.import_tasks: roles/tsm_ms_sql/tasks/install-tsm-for-mssql.yml
+  when: ansible_os_family == "Windows"

@@ -1,0 +1,46 @@
+---
+- name: Generating dsm.opt file
+  tags: windows
+  win_template:
+    src: templates/dsmcad-win.opt.j2
+    dest: C:\Program Files\tivoli\tsm\baclient\dsm_{{ dsmcad_index }}.opt
+  when: ansible_os_family == 'Windows'
+
+- name: Installing TSM Client Scheduler
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install scheduler
+      /name:"TSM Client Scheduler {{ dsmcad_index }}"
+      /clientdir:"{{ baclient_path }}"
+      /optfile:"{{ baclient_path }}\dsm_{{ dsmcad_index }}.opt"
+      /node:{{ ansible_hostname }}_{{ dsmcad_index }}
+      /password: {{ tdp_password }}
+      /schedlog:"{{ baclient_path }}\dsmsched_{{ dsmcad_index }}.log"
+      /errorlog:"{{ baclient_path }}\dsmerror_{{ dsmcad_index }}.log"
+      /eventlogging:yes
+    chdir: "{{ baclient_path }}"
+  when: ansible_os_family == 'Windows'
+
+- name: Installing TSM Client Acceptor
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install cad
+      /name:"TSM Client Acceptor {{ dsmcad_index }}"
+      /password: {{ tdp_password }}
+      /cadschedname:"TSM Client Scheduler {{ dsmcad_index }}"
+      /optfile:"{{ baclient_path }}\dsm_{{ dsmcad_index }}.opt"
+      /clientdir:"{{ baclient_path }}"
+      /httpport:{{ http_port }}
+      /autostart:yes
+      /startnow:yes
+    chdir: "{{ baclient_path }}"
+  when: ansible_os_family == 'Windows'
+
+- name: Starting TSM Client Acceptor Service
+  tags: windows
+  ansible.windows.win_service:
+    name: TSM Client Acceptor {{ dsmcad_index }}
+    state: started
+  when: ansible_os_family == 'Windows'

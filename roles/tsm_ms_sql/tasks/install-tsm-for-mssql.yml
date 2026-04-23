@@ -1,0 +1,122 @@
+---
+- name: Kopiowanie paczek do instalacji TDP for MSSQL z serwera FTP
+- name: Copying installation packages for TDP for MSSQL from FTP server
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/files/tsm_ms_sql/SP_DBS_{{ tdp_sql_version }}_DP_MS_SQL_ML.exe
+    dest: C:\Users\Administrator\Downloads
+  when: ansible_os_family == "Windows"
+
+- name: Searching TDP for Hyper-V packages
+  tags: windows
+  ansible.windows.win_find:
+    paths: C:\Users\Administrator\Downloads
+    patterns: SP_DBS_{{ tdp_sql_version }}_DP_MS_SQL_ML.exe
+  register: match
+  when: ansible_os_family == "Windows"
+
+- name: Checking if directory with installation files already exists
+  tags: windows
+  ansible.windows.win_find:
+    paths: C:\Users\Administrator\Downloads
+    patterns: TSMSQL_WIN
+    file_type: directory
+  register: tsmsql
+  when: ansible_os_family == "Windows"
+
+- name: Unpacking installation files for TDP for MSSQL
+  tags: windows
+  ansible.windows.win_command: .\{{match.files[0].filename}}
+  args:
+    chdir: C:\Users\Administrator\Downloads\
+  when: ansible_os_family == "Windows" and tsmsql.matched == 0
+
+- name: Installing IBM SP for Databases pt.1
+  tags: windows
+  ansible.windows.win_package:
+    path: C:\Users\Administrator\Downloads\TSMSQL_WIN\fcm\x64\mmc\81170\enu\IBM Spectrum Protect for Databases - MS SQL - Management Console.msi
+    state: present
+    arguments: >-
+      RebootYesNo="No"
+      REBOOT="Suppress"
+      ALLUSERS=1
+      INSTALLDIR="C:\\Program Files\\Tivoli"
+      ADDLOCAL="Client"
+      TRANSFORMS=1033.mst
+      /qn /l*v "c:\mssql_mmc_log.txt"
+  when: ansible_os_family == "Windows"
+
+- name: Installing IBM SP for Databases pt.2
+  tags: windows
+  ansible.windows.win_package:
+    path: C:\Users\Administrator\Downloads\TSMSQL_WIN\fcm\x64\sql\81170\enu\IBM Spectrum Protect for Databases - MS SQL.msi
+    state: present
+    arguments: >-
+      RebootYesNo="No"
+      REBOOT="Suppress"
+      ALLUSERS=1
+      INSTALLDIR="C:\\Program Files\\Tivoli\\TSM"
+      ADDLOCAL="Client"
+      TRANSFORMS=1033.mst
+      /qn /l*v "c:\mssql_sql_log.txt"
+  when: ansible_os_family == "Windows"
+
+- name: Copying tdpsql.cfg file
+  tags: windows
+  ansible.windows.win_copy:
+    src: templates/tdpsql.cfg
+    dest: C:\Program Files\tivoli\tsm\TDPSql\tdpsql.cfg
+  when: ansible_os_family == "Windows"
+
+- name: Creating dsm.opt file
+  tags: windows
+  win_template:
+    src: templates/dsm-win.opt.j2
+    dest: C:\Program Files\tivoli\tsm\TDPSql\dsm.opt
+  when: ansible_os_family == "Windows"
+
+- name: Installing TSM Client Scheduler SQL service
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install scheduler
+      /name:"TSM Client Scheduler SQL"
+      /clientdir:"{{ baclient_path }}"
+      /optfile:"{{ tdpsql_path }}\dsm.opt"
+      /node:{{ tsm["nodename"] }}_sql
+      /password:{{ tsm_node_password }}
+      /schedlog:"{{ baclient_path }}\dsmsched_sql.log"
+      /errorlog:"{{ baclient_path }}\dsmerror_sql.log"
+      /eventlogging:yes
+    chdir: "{{ baclient_path }}"
+
+- name: Installing TSM Client Acceptor SQL service
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install cad
+      /name:"TSM Client Acceptor SQL"
+      /password:{{ tsm_node_password }}
+      /cadschedname:"TSM Client Scheduler SQL"
+      /optfile:"{{ tdpsql_path }}\dsm.opt"
+      /clientdir:"{{ baclient_path }}"
+      /httpport:{{ http_port }}
+      /autostart:yes
+      /startnow:yes
+    chdir: "{{ baclient_path }}"
+
+- name: Adding SQL database permissiong to TSM Client Scheduler for SQL service
+  tags: windows
+  ansible.windows.win_service:
+    name: TSM Client Scheduler SQL
+    state: stopped
+    username: "{{ sql_user }}"
+    password: "{{ sql_user_password }}"
+
+- name: Adding SQL database permissiong to TSM Client Acceptor for SQL service
+  tags: windows
+  ansible.windows.win_service:
+    name: TSM Client Acceptor SQL
+    state: started
+    username: "{{ sql_user }}"
+    password: "{{ sql_user_password }}"

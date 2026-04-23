@@ -1,0 +1,7 @@
+inventory
+*playbook.yml
+playbook_local.yml
+DEL*
+ansible.cfg
+.vscode/
+roles/tsm_ms_sql/templates/scripts

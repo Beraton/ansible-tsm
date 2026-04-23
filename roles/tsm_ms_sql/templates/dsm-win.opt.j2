@@ -1,0 +1,13 @@
+{% if tsm['nodename'] is defined %}
+NODENAME {{ tsm['nodename'] }}_sql
+{% else %}
+NODENAME {{ ansible_hostname }}_sql
+{% endif %}
+TCPSERVERADDRESS {{ tcp_server_address }}
+COMMMETHOD TCPIP
+PASSWORDAccess generate
+TCPPORT {{ tcp_port }}
+{% if http_port is defined %}
+HTTPPORT {{ http_port }}
+{% endif %}
+MANAGEDSERVICES Schedule

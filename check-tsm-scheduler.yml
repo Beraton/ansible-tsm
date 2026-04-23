@@ -1,0 +1,5 @@
+---
+- hosts: cluster_nodes_win
+  tasks:
+  - name: Check TSM Scheduler
+    import_tasks: roles/cluster_nodes_win/tasks/check-tsm-scheduler.yml

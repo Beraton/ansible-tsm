@@ -1,0 +1,134 @@
+---
+- name: Copying installation packages for IBM SP Client from FTP server (WIN)
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/files/tsm_client/TIV-TSMBAC-WinX64-{{ client_version }}.exe
+    dest: C:\Users\Administrator\Downloads
+  when: ansible_os_family == "Windows"
+
+- name: Copying installation packages for JRE 8 from FTP server (WIN)
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_user }}:{{ ftp_password }}@{{ ftp_server }}/files/tsm_client/jre-8u381-win.exe
+    dest: C:\Users\Administrator\Downloads
+  when: ansible_os_family == "Windows"
+
+- name: Searching IBM SP Client packages (WIN)
+  tags: windows
+  ansible.windows.win_find:
+    paths: C:\Users\Administrator\Downloads
+    patterns: TIV-TSMBAC-WinX64-{{ client_version }}.exe
+  register: match
+  when: ansible_os_family == "Windows"
+
+- name: Cleaning old installation packages for IBM SP Client (WIN)
+  tags: windows
+  ansible.windows.win_file:
+    path: C:\Users\Administrator\Downloads\TSMClient
+    state: absent
+  changed_when: false
+  when: ansible_os_family == "Windows"
+
+- name: Unpacking installation files for IBM SP Client (WIN)
+  tags: windows
+  ansible.windows.win_command: .\{{ match.files[0].filename }}
+  args:
+    chdir: C:\Users\Administrator\Downloads\
+  changed_when: false
+  when: ansible_os_family == "Windows"
+
+- name: Installing MS 2012 C++ redistributable (WIN)
+  tags: windows
+  ansible.windows.win_package:
+    path: C:\Users\Administrator\Downloads\TSMClient\ISSetupPrerequisites\{3A3AF437-A9CD-472f-9BC9-8EEDD7505A02}\vcredist_x64.exe
+    product_id: "{CF2BEA3C-26EA-32F8-AA9B-331F7E34BA97}"
+    state: present
+    arguments: /q /c:"msiexec /i vcredist.msi /qn /l*v c:/vcredist_x86.log"
+  when: ansible_os_family == "Windows"
+
+# This task may return rc=1638 which means that new version of vcredist is already installed
+# in this case this error is ignored and playbook continues
+- name: Installing MS 2017 C++ redistributable (WIN)
+  tags: windows
+  ansible.windows.win_package:
+    path: C:\Users\Administrator\Downloads\TSMClient\ISSetupPrerequisites\{915387C3-E260-4985-861D-E7A891A4F74B}\vc_redist.x64.exe
+    product_id: "{C99E2ADC-0347-336E-A603-F1992B09D582}"
+    state: present
+    arguments: /q /c:"msiexec /i vcredist.msi /qn /l*v c:/vcredist_x86.log"
+    expected_return_code: [0, 1638]
+  when: ansible_os_family == "Windows"
+
+- name: Installing JRE 8 (WIN)
+  tags: windows
+  ansible.windows.win_package:
+    path: c:\Users\Administrator\Downloads\jre-8u381-win.exe
+    product_id: "{77924AE4-039E-4CA4-87B4-2F64180381F0}"
+    state: present
+    arguments: /s
+  when: ansible_os_family == "Windows"
+
+- name: Add environment variable to PATH on Windows (WIN)
+  tags: windows
+  ansible.windows.win_path:
+    name: JAVA_HOME
+    elements: C:\Program Files\Java\jre-1.8\bin
+    state: present
+  when: ansible_os_family == "Windows"
+
+- name: Installing IBM SP Client (WIN)
+  tags: windows
+  ansible.windows.win_package:
+    path: C:\Users\Administrator\Downloads\TSMClient\IBM Spectrum Protect Client.msi
+    state: present
+    arguments: >-
+      RebootYesNo="No"
+      REBOOT="Suppress"
+      ALLUSERS=1
+      INSTALLDIR="c:\\program Files\\tivoli\\tsm"
+      ADDLOCAL="BackupArchiveGUI,BackupArchiveWeb,Api64Runtime,AdministrativeCmd"
+      TRANSFORMS=1033.mst
+      /qn /l*v "c:\log.txt"
+  when: ansible_os_family == "Windows"
+
+- name: Creating dsm.opt file (WIN)
+  tags: windows
+  win_template:
+    src: dsm-win.opt.j2
+    dest: C:\Program Files\tivoli\tsm\baclient\dsm.opt
+  when: ansible_os_family == "Windows"
+
+- name: Creating TSM Client Scheduler service (WIN)
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install scheduler
+      /name:"TSM Client Scheduler"
+      /clientdir:"{{ baclient_path }}"
+      /optfile:"{{ baclient_path }}\dsm.opt"
+      /node:{{ tsm["nodename"] }}
+      /password:{{ tsm_node_password }}
+      /schedlog:"{{ baclient_path }}\dsmsched.log"
+      /errorlog:"{{ baclient_path }}\dsmerror.log"
+      /eventlogging:yes
+    chdir: "{{ baclient_path }}"
+
+- name: Installing TSM Client Acceptor service(WIN)
+  tags: windows
+  ansible.windows.win_powershell:
+    script: >
+      .\dsmcutil.exe install cad
+      /name:"TSM Client Acceptor"
+      /password:{{ tsm_node_password }}
+      /cadschedname:"TSM Client Scheduler"
+      /optfile:"{{ baclient_path }}\dsm.opt"
+      /clientdir:"{{ baclient_path }}"
+      /httpport:{{ http_port }}
+      /autostart:yes
+      /startnow:yes
+    chdir: "{{ baclient_path }}"
+
+- name: Enabling TSM Client Acceptor service(WIN)
+  tags: windows
+  ansible.windows.win_service:
+    name: TSM Client Acceptor
+    state: started

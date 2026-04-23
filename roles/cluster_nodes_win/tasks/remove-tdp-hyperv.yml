@@ -1,0 +1,41 @@
+---
+- name: Find all TSM Client Scheduler/Acceptor services
+  tags: windows
+  ansible.windows.win_service_info:
+    name: TSM*
+  register: service_info
+
+- name: Remove all TSM Acceptor/Scheduler services
+  tags: windows
+  ansible.windows.win_powershell:
+    script: .\dsmcutil.exe remove /name:"{{ item.display_name }}"
+    chdir: "{{ baclient_path }}"
+  loop: "{{ service_info.services }}"
+
+- name: Uninstall TDP for Hyper-V suite
+  tags: windows
+  ansible.windows.win_powershell:
+    script: .\spinstall.exe /silent /remove
+    chdir: C:\Users\Administrator\Downloads\TSMHYPERV_WIN
+
+- name: Copying TDP for Hyper-V uninstallation script
+  tags: windows
+  ansible.windows.win_get_url:
+    url: ftp://{{ ftp_server }}/files/tsm_tdp_win/scripts/uninstall_hyperv.ps1
+    dest: C:\Users\Administrator\Downloads
+    url_username: "{{ ftp_user }}"
+    url_password: "{{ ftp_password }}"
+
+- name: Run TDP for Hyper-V component uninstall script
+  tags: windows
+  become: true
+  ansible.windows.win_powershell:
+    script: .\uninstall_hyperv.ps1
+    chdir: C:\Users\Administrator\Downloads
+
+- name: Remove TDP for Hyper-V directory
+  tags: windows
+  ansible.windows.win_file:
+    path: C:\Users\Administrator\Downloads\TSMHYPERV_WIN
+    state: absent
+  when: ansible_os_family == "Windows"

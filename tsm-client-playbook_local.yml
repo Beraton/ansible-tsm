@@ -1,0 +1,10 @@
+---
+- hosts: all
+  pre_tasks:
+    - name: Gatering variables
+      tags: always
+      include_vars: host_vars/vars
+
+- hosts: tsm_clients
+  roles:
+    - tsm_clients

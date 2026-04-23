@@ -1,0 +1,8 @@
+---
+- name: Install TSM Client for Linux
+  ansible.builtin.import_tasks: install-tsm-client-linux.yml
+  when: ansible_system == "Linux"
+
+- name: Install TSM Client for Linux (Windows)
+  ansible.builtin.import_tasks: install-tsm-client-win.yml
+  when: ansible_os_family == "Windows"

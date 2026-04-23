@@ -1,0 +1,20 @@
+[Unit]
+Description="IBM SP Client dsmcad service."
+After=local-fs.target network-online.target
+
+[Service]
+Type=forking
+GuessMainPID=no
+Environment="DSM_LOG=/opt/tivoli/tsm/client/ba/bin"
+Environment="JAVA_HOME=/opt/tivoli/tsm/tdpvmware/common/jre/jre"
+Environment="LD_LIBRARY_PATH=/opt/tivoli/tsm/client/ba/bin:/opt/tivoli/tsm/tdpvmware/common/jre/jre/bin/classic"
+Environment="PATH=/opt/tivoli/tsm/tdpvmware/common/jre/jre/bin:/sbin:/usr/sbin:/usr/local/sbin:/root/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="LANG=en_US.UTF-8"
+Environment="LC_ALL=en_US.UTF-8"
+ExecStart=/usr/bin/dsmcad
+ExecStopPost=/bin/bash -c 'let i=0; while [[ (-n "$(ps -eo comm | grep dsmcad)") && ($i -le 10) ]]; do let i++; sleep 1; done'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+

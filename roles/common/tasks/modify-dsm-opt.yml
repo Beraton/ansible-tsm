@@ -1,0 +1,61 @@
+---
+- name: Add text to specified dsm file (WIN)
+  tags: windows
+  win_lineinfile:
+    path: C:\Program Files\Tivoli\tsm\baclient\{{ target_file }}
+    state: present
+    line: "{{ content }}"
+  when: ansible_os_family == "Windows" and action == "add"
+
+- name: Add text to specified dsm file (Linux)
+  tags: linux
+  ansible.builtin.lineinfile:
+    path: /opt/tivoli/tsm/client/ba/bin/{{ target_file }}
+    state: present
+    line: "{{ content }}"
+  when: ansible_system == "Linux" and action == "add"
+
+- name: Remove text from specified dsm file (WIN)
+  tags: windows
+  win_lineinfile:
+    path: C:\Program Files\Tivoli\tsm\baclient\{{ target_file }}
+    state: absent
+    line: "{{ content }}"
+  when: ansible_os_family == "Windows" and action == "remove"
+
+- name: Remove text from to specified dsm file (Linux)
+  tags: linux
+  ansible.builtin.lineinfile:
+    path: /opt/tivoli/tsm/client/ba/bin/{{ target_file }}
+    state: absent
+    line: "{{ content }}"
+  when: ansible_system == "Linux" and action == "remove"
+
+- name: Get a list of all *.opt files (WIN)
+  tags: windows
+  ansible.windows.win_powershell:
+    script: Get-ChildItem -Name "*.opt"
+    chdir: C:\Program Files\Tivoli\tsm\baclient\
+  register: files
+  when: ansible_os_family == "Windows" and action == "show"
+
+- name: Display contents of all *.opt files (WIN)
+  tags: windows
+  ansible.windows.win_powershell:
+    script: more {{ item }}
+    chdir: C:\Program Files\Tivoli\tsm\baclient\
+  loop: "{{ files.output }}"
+  when: ansible_os_family == "Windows" and action == "show"
+
+- name: Get a list of all *.sys files (Linux)
+  tags: linux
+  ansible.builtin.find:
+    paths: /opt/tivoli/tsm/client/ba/bin/
+    patterns: "*.sys"
+  register: file_list
+  when: ansible_system == "Linux" and action == "show"
+
+- name: Display contents of all *.sys files (Linux)
+  ansible.builtin.command: cat {{ item.path }}
+  loop: "{{ file_list.files }}"
+  when: ansible_system == "Linux" and action == "show"

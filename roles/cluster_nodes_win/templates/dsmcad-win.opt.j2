@@ -1,0 +1,13 @@
+{% if dsmcad_index is defined and dsmcad_index|length %}
+NODENAME {{ ansible_hostname }}_{{ dsmcad_index }}
+{% else %}
+NODENAME {{ ansible_hostname }}
+{% endif %}
+TCPSERVERADDRESS {{ tcp_server_address }}
+COMMMETHOD TCPIP
+PASSWORDAccess generate
+TCPPORT {{ tcp_port }}
+{% if http_port is defined %}
+HTTPPORT {{ http_port }}
+{% endif %}
+MANAGEDSERVICES Schedule

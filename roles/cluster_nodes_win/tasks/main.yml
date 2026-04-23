@@ -1,0 +1,12 @@
+---
+- name: Install TDP for Hyper-V
+  ansible.builtin.import_tasks: install-tdp-hyperv.yml
+  when: ansible_os_family == "Windows" and tdp_install is defined and tdp_install|bool == true
+
+- name: Install datamover
+  ansible.builtin.import_tasks: add-datamover.yml
+  when: ansible_os_family == "Windows" and tdp_install is not defined
+
+- name: Remove TDP for Hyper-V
+  ansible.builtin.import_tasks: remove-tdp-hyperv.yml
+  when: ansible_os_family == "Windows" and tdp_remove is defined and tdp_remove|bool == true
